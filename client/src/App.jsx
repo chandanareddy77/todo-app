@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { getTodos, createTodo, updateTodo, deleteTodo } from "./api";
+import {
+  getTodos,
+  createTodo,
+  updateTodo,
+  deleteTodo,
+} from "./api";
+
 import { FILTERS } from "./filters";
 import Sidebar from "./components/Sidebar";
 import TodoForm from "./components/TodoForm";
@@ -11,47 +17,77 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Runs an API action and shows its error in the banner if it fails
+  // Runs an API action and shows errors in the UI
   const run = async (action) => {
     try {
       setError("");
       await action();
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      setError(err.message || "Something went wrong");
     }
   };
 
+  // Load todos when application starts
   useEffect(() => {
-    run(async () => setTodos(await getTodos())).finally(() =>
-      setLoading(false)
-    );
+    const loadTodos = async () => {
+      try {
+        setError("");
+        const data = await getTodos();
+        setTodos(data);
+      } catch (err) {
+        console.error(err);
+        setError(err.message || "Failed to load todos");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTodos();
   }, []);
 
+  // Add todo
   const handleAdd = (title) =>
     run(async () => {
       const newTodo = await createTodo(title);
+
       setTodos((prev) => [newTodo, ...prev]);
     });
 
+  // Update todo
   const handleUpdate = (id, data) =>
     run(async () => {
       const updated = await updateTodo(id, data);
-      // TODO: Complete this. Update the `todos` state so the edited todo is
-      // replaced with `updated` (keep every other todo as it is).
+
+      setTodos((prev) =>
+        prev.map((todo) =>
+          todo._id === updated._id ? updated : todo
+        )
+      );
     });
 
+  // Delete todo
   const handleDelete = (id) =>
     run(async () => {
       await deleteTodo(id);
-      setTodos((prev) => prev.filter((t) => t._id !== id));
+
+      setTodos((prev) =>
+        prev.filter((todo) => todo._id !== id)
+      );
     });
 
+  // Delete all completed todos
   const handleClearDone = () =>
     run(async () => {
       const done = todos.filter(FILTERS.done.test);
-      await Promise.all(done.map((t) => deleteTodo(t._id)));
-      setTodos((prev) => prev.filter((t) => !t.completed));
+
+      await Promise.all(
+        done.map((todo) => deleteTodo(todo._id))
+      );
+
+      setTodos((prev) =>
+        prev.filter((todo) => !todo.completed)
+      );
     });
 
   const filteredTodos = todos.filter(FILTERS[filter].test);
@@ -68,8 +104,10 @@ function App() {
       <main className="panel content">
         <header className="content-header">
           <h2>{FILTERS[filter].label}</h2>
+
           <span className="content-count">
-            {filteredTodos.length} {filteredTodos.length === 1 ? "task" : "tasks"}
+            {filteredTodos.length}{" "}
+            {filteredTodos.length === 1 ? "task" : "tasks"}
           </span>
         </header>
 
@@ -78,7 +116,11 @@ function App() {
         {error && (
           <div className="error" role="alert">
             <span>{error}</span>
-            <button onClick={() => setError("")} aria-label="Dismiss">
+
+            <button
+              onClick={() => setError("")}
+              aria-label="Dismiss"
+            >
               ×
             </button>
           </div>
@@ -89,6 +131,7 @@ function App() {
         ) : filteredTodos.length === 0 ? (
           <div className="empty">
             <img src="/logo.png" alt="" />
+
             <p>
               {filter === "done"
                 ? "Nothing completed yet"
